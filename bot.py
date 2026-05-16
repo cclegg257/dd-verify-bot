@@ -60,7 +60,7 @@ async def verify(interaction: discord.Interaction, email: str):
         try:
             await member.add_roles(role)
             await interaction.followup.send(
-                "✅ You've been verified as a paid Dynasty Dugout member! Welcome to the GM War Room. 🎉",
+                "✅ You've been verified as a paid Dynasty Dugout member! Thanks for supporting the site. 🎉",
                 ephemeral=True
             )
         except discord.Forbidden:
@@ -70,7 +70,7 @@ async def verify(interaction: discord.Interaction, email: str):
             )
     else:
         await interaction.followup.send(
-            "❌ That email wasn't found on our subscriber list. Make sure you're using the email you signed up with at The Dynasty Dugout. If you think this is an error, DM an admin.",
+            "❌ That email wasn't found on our subscriber list. Make sure you're using the email you signed up with at The Dynasty Dugout or please upgrade your account to paid. If you think this is an error, DM an admin.",
             ephemeral=True
         )
 
