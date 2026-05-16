@@ -1,18 +1,29 @@
 import discord
-from discord.ext import commands
 from discord import app_commands
 import os
 
 # ---- CONFIG ----
 ROLE_NAME = "DD Verified"
 ALLOWED_EMAILS_FILE = "emails.txt"
+GUILD_ID = int(os.environ["GUILD_ID"])
 # ----------------
 
 intents = discord.Intents.default()
 intents.message_content = True
 intents.members = True
 
-bot = commands.Bot(command_prefix="!", intents=intents)
+class MyBot(discord.Client):
+    def __init__(self):
+        super().__init__(intents=intents)
+        self.tree = app_commands.CommandTree(self)
+
+    async def setup_hook(self):
+        guild = discord.Object(id=GUILD_ID)
+        self.tree.copy_global_to(guild=guild)
+        await self.tree.sync(guild=guild)
+        print(f"Commands synced to guild {GUILD_ID}")
+
+bot = MyBot()
 
 def load_emails():
     with open(ALLOWED_EMAILS_FILE, "r") as f:
@@ -21,16 +32,10 @@ def load_emails():
 @bot.event
 async def on_ready():
     print(f"Logged in as {bot.user}")
-    try:
-        guild = discord.Object(id=1035383785925115984)
-        bot.tree.copy_global_to(guild=guild)
-        synced = await bot.tree.sync(guild=guild)
-        print(f"Synced {len(synced)} command(s)")
-    except Exception as e:
-        print(e)
+    print(f"Commands registered: {[cmd.name for cmd in bot.tree.get_commands()]}")
 
-@bot.tree.command(name="verify", description="Verify your Dynasty Dugout membership")
-@app_commands.describe(email="The email address you used to subscribe")
+@bot.tree.command(name="verify", description="Verify your Dynasty Dugout membership", guild=discord.Object(id=GUILD_ID))
+@app_commands.describe(email="The email address you used to subscribe to Dynasty Dugout")
 async def verify(interaction: discord.Interaction, email: str):
     await interaction.response.defer(ephemeral=True)
 
