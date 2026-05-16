@@ -22,7 +22,7 @@ def load_emails():
 async def on_ready():
     print(f"Logged in as {bot.user}")
     try:
-        guild = discord.Object(id=YOUR_SERVER_ID)
+        guild = discord.Object(id=1035383785925115984)
         bot.tree.copy_global_to(guild=guild)
         synced = await bot.tree.sync(guild=guild)
         print(f"Synced {len(synced)} command(s)")
