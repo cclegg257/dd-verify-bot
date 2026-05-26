@@ -23,13 +23,19 @@ class MyBot(discord.Client):
         self.tree.copy_global_to(guild=guild)
         await self.tree.sync(guild=guild)
         print(f"Commands synced to guild {GUILD_ID}")
-        self.loop.create_task(self.daily_role_check())
  
 bot = MyBot()
  
 def load_emails():
     with open(ALLOWED_EMAILS_FILE, "r") as f:
         return set(line.strip().lower() for line in f if line.strip())
+ 
+async def daily_role_check():
+    await bot.wait_until_ready()
+    while not bot.is_closed():
+        print("Running daily unsubscribe check...")
+        await remove_unsubscribed_members()
+        await asyncio.sleep(86400)
  
 async def remove_unsubscribed_members():
     guild = bot.get_guild(GUILD_ID)
@@ -44,47 +50,34 @@ async def remove_unsubscribed_members():
  
     allowed_emails = load_emails()
     removed_count = 0
+    verified_file = "verified_members.txt"
  
-    async for member in guild.fetch_members(limit=None):
-        if role in member.roles:
-            # Check if any of their known emails are on the list
-            # We store verified emails in a local file
-            verified_file = "verified_members.txt"
-            member_email = None
+    if not os.path.exists(verified_file):
+        print("No verified_members.txt found, skipping check.")
+        return
  
-            if os.path.exists(verified_file):
-                with open(verified_file, "r") as f:
-                    for line in f:
-                        parts = line.strip().split(",")
-                        if len(parts) == 2 and parts[0] == str(member.id):
-                            member_email = parts[1].lower()
-                            break
+    with open(verified_file, "r") as f:
+        records = [line.strip().split(",") for line in f if "," in line.strip()]
  
-            if member_email and member_email not in allowed_emails:
+    for parts in records:
+        member_id, member_email = int(parts[0]), parts[1].lower()
+        if member_email not in allowed_emails:
+            member = guild.get_member(member_id)
+            if member and role in member.roles:
                 try:
                     await member.remove_roles(role)
                     removed_count += 1
-                    print(f"Removed role from {member.name} ({member_email}) - no longer subscribed")
+                    print(f"Removed role from {member.name} ({member_email})")
                 except discord.Forbidden:
-                    print(f"Could not remove role from {member.name} - permission error")
+                    print(f"Could not remove role from {member_id} - permission error")
  
     print(f"Daily check complete. Removed role from {removed_count} member(s).")
- 
-async def daily_role_check(bot_instance=None):
-    await bot.wait_until_ready()
-    while not bot.is_closed():
-        print("Running daily unsubscribe check...")
-        await remove_unsubscribed_members()
-        # Wait 24 hours before next check
-        await asyncio.sleep(86400)
- 
-bot.loop = asyncio.get_event_loop()
  
 @bot.event
 async def on_ready():
     print(f"Logged in as {bot.user}")
     print(f"Commands registered: {[cmd.name for cmd in bot.tree.get_commands()]}")
-    bot.loop.create_task(daily_role_check())
+    asyncio.ensure_future(daily_role_check())
  
 @bot.tree.command(name="verify", description="Verify your Dynasty Dugout membership", guild=discord.Object(id=GUILD_ID))
 @app_commands.describe(email="The email address you used to subscribe to Dynasty Dugout")
@@ -112,7 +105,6 @@ async def verify(interaction: discord.Interaction, email: str):
             return
         try:
             await member.add_roles(role)
-            # Save the member's email so we can check it later
             with open("verified_members.txt", "a") as f:
                 f.write(f"{member.id},{clean_email}\n")
             await interaction.followup.send(
